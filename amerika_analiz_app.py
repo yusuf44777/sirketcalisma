@@ -1,11 +1,17 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import warnings
 warnings.filterwarnings('ignore')
+
+# Plotly'yi opsiyonel hale getirelim
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    st.warning("Plotly kütüphanesi bulunamadı. Bazı grafikler görüntülenemeyebilir.")
 
 # Sayfa konfigürasyonu
 st.set_page_config(
@@ -188,14 +194,20 @@ def main():
         
         with col2:
             st.markdown("#### 🎯 Pazar Payı Dağılımı")
-            fig_pie = px.pie(
-                pazar_satislari, 
-                values='SUM(quantity)', 
-                names='marketplace_key',
-                title="Pazar Payları"
-            )
-            fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-            st.plotly_chart(fig_pie, use_container_width=True)
+            if PLOTLY_AVAILABLE:
+                fig_pie = px.pie(
+                    pazar_satislari, 
+                    values='SUM(quantity)', 
+                    names='marketplace_key',
+                    title="Pazar Payları"
+                )
+                fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                # Streamlit native pie chart
+                st.subheader("Pazar Payları")
+                chart_data = pazar_satislari.set_index('marketplace_key')['SUM(quantity)']
+                st.bar_chart(chart_data)
     
     with tab3:
         st.markdown("### 📂 Kategori Bazında Analiz")
@@ -221,14 +233,20 @@ def main():
         
         with col2:
             st.markdown("#### 📊 Kategori Satış Grafiği")
-            fig_bar = px.bar(
-                kategori_satislari, 
-                x='kategori', 
-                y='SUM(quantity)',
-                title="Kategori Bazında Satış Miktarları",
-                labels={'kategori': 'Kategori', 'SUM(quantity)': 'Satış Miktarı'}
-            )
-            st.plotly_chart(fig_bar, use_container_width=True)
+            if PLOTLY_AVAILABLE:
+                fig_bar = px.bar(
+                    kategori_satislari, 
+                    x='kategori', 
+                    y='SUM(quantity)',
+                    title="Kategori Bazında Satış Miktarları",
+                    labels={'kategori': 'Kategori', 'SUM(quantity)': 'Satış Miktarı'}
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                # Streamlit native bar chart
+                st.subheader("Kategori Bazında Satış Miktarları")
+                chart_data = kategori_satislari.set_index('kategori')['SUM(quantity)']
+                st.bar_chart(chart_data)
     
     with tab4:
         st.markdown("### 📊 Detaylı Görselleştirmeler")
@@ -237,30 +255,40 @@ def main():
         st.markdown("#### 🏆 En Çok Satan 15 Ürün")
         top_15 = urun_satislari.head(15)
         
-        fig_products = px.bar(
-            top_15, 
-            x='SUM(quantity)', 
-            y='variant_name',
-            orientation='h',
-            title="En Çok Satan 15 Ürün",
-            labels={'SUM(quantity)': 'Satış Miktarı', 'variant_name': 'Ürün Adı'}
-        )
-        fig_products.update_layout(height=600)
-        st.plotly_chart(fig_products, use_container_width=True)
+        if PLOTLY_AVAILABLE:
+            fig_products = px.bar(
+                top_15, 
+                x='SUM(quantity)', 
+                y='variant_name',
+                orientation='h',
+                title="En Çok Satan 15 Ürün",
+                labels={'SUM(quantity)': 'Satış Miktarı', 'variant_name': 'Ürün Adı'}
+            )
+            fig_products.update_layout(height=600)
+            st.plotly_chart(fig_products, use_container_width=True)
+        else:
+            # Streamlit native horizontal bar chart
+            chart_data = top_15.set_index('variant_name')['SUM(quantity)'].sort_values(ascending=True)
+            st.bar_chart(chart_data, horizontal=True)
         
-        # Pazar-Kategori Heatmap
-        st.markdown("#### 🔥 Pazar ve Kategori İlişkisi (Heatmap)")
+        # Pazar-Kategori Analizi (tablo olarak)
+        st.markdown("#### 🔥 Pazar ve Kategori İlişkisi")
         pazar_kategori = df_filtered.groupby(['marketplace_key', 'kategori'])['SUM(quantity)'].sum().reset_index()
         pazar_kategori_pivot = pazar_kategori.pivot(index='marketplace_key', columns='kategori', values='SUM(quantity)')
         pazar_kategori_pivot = pazar_kategori_pivot.fillna(0)
         
-        fig_heatmap = px.imshow(
-            pazar_kategori_pivot,
-            title="Pazar ve Kategori Bazında Satış Dağılımı",
-            labels=dict(x="Kategori", y="Pazar", color="Satış Miktarı"),
-            aspect="auto"
-        )
-        st.plotly_chart(fig_heatmap, use_container_width=True)
+        if PLOTLY_AVAILABLE:
+            fig_heatmap = px.imshow(
+                pazar_kategori_pivot,
+                title="Pazar ve Kategori Bazında Satış Dağılımı",
+                labels=dict(x="Kategori", y="Pazar", color="Satış Miktarı"),
+                aspect="auto"
+            )
+            st.plotly_chart(fig_heatmap, use_container_width=True)
+        else:
+            # Tablo olarak göster
+            st.subheader("Pazar ve Kategori Bazında Satış Dağılımı")
+            st.dataframe(pazar_kategori_pivot, use_container_width=True)
     
     with tab5:
         st.markdown("### 📋 Detaylı Analiz Raporu")
